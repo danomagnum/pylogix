@@ -674,7 +674,7 @@ class PLC(object):
                         AttributeCount,
                         TimeAttribute)
 
-        return(request)
+        print(request)
         status, ret_data = self.conn.send(request)
 
         if status == 0:
@@ -698,24 +698,30 @@ class PLC(object):
         if not conn[0]:
             return Response(None, None, conn[1])
       
+        packstr = '<BB'
         AttributeService = service_id
         AttributeSize = 0x02
         if class_id > 255:
             # 16 bit class type
             AttributeClassType = 0x21
+            packstr += 'BH'
         else:
             # 8 bit class type
             AttributeClassType = 0x20
+            packstr += 'BB'
         AttributeClass = class_id
+
         if instance_id > 255:
             # 16 bit instance
             AttributeInstanceType = 0x25
+            packstr += 'BH'
         else:
             # 8 bit instance
             AttributeInstanceType = 0x24
+            packstr += 'BB'
         AttributeInstance = instance_id
 
-        request = pack('<BBBBBBH',
+        request = pack(packstr,
                         AttributeService,
                         AttributeSize,
                         AttributeClassType,
@@ -726,6 +732,7 @@ class PLC(object):
         if data is not None:
             request += data
 
+        print(request)
         status, ret_data = self.conn.send(request, connected=False, slot=0)
 
 
