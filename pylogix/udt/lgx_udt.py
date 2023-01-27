@@ -340,13 +340,15 @@ class UDT(CIPType):
 class BITS(CIPType):
     def __init__(self, BitNames):
         """
-        Structure object for creating strings that correspond to python byte objects bytes (no encodings)
-        :param length: how many elements the array contains
+        Structure object for creating packed bools in a UDT
+        :param BitNames: a list of strings, one per bit in order from first to last
         """
         
-        # bit packed structs are aligned on 16 bit words.  Figure out how many we've got.
-        self.length = len(BitNames) // 16
-        self.format = f'{self.length}H'
+        # bit packed structs are aligned on 32 bit words.  Figure out how many we've got.
+        self.length = len(BitNames) // 32
+        if self.length == 0:
+            self.length = 1
+        self.format = f'{self.length}I'
         self.struct = struct.Struct(self.format)
         self.BitNames = BitNames
 
@@ -363,8 +365,8 @@ class BITS(CIPType):
 
         bitpos = 0
         for bitname in self.BitNames:
-            wordpos = bitpos // 16
-            wordbit = bitpos % 16
+            wordpos = bitpos // 32
+            wordbit = bitpos % 32
             word = unpacked_data[wordpos]
             mask = 1 << wordbit
             result = word & mask != 0
@@ -382,8 +384,8 @@ class BITS(CIPType):
         bitpos = 0
         words = [0] * self.length
         for bitname in self.BitNames:
-            wordpos = bitpos // 16
-            wordbit = bitpos % 16
+            wordpos = bitpos // 32
+            wordbit = bitpos % 32
             word = words[wordpos]
             bitval = value.get(bitname)
             if bitval:
@@ -402,15 +404,13 @@ class BITS(CIPType):
 
 # note that for some reason the bits on these built-in data types are backwards (big endian on a 16 bit word boundary)
 timer_struct = OrderedDict()
-timer_struct['Padding'] = SPARE(2) 
-timer_struct['StatusBits'] = BITS(("", "", "", "", "", "", "", "", "", "", "", "", "", "DN", "TT", "EN"))
+timer_struct['StatusBits'] = BITS( [""]*29 + ["DN", "TT", "EN"])
 timer_struct['PRE'] = DINT
 timer_struct['ACC'] = DINT
 TIMER = UDT(timer_struct)
 
 counter_struct = OrderedDict()
-counter_struct['Padding'] = SPARE(2)
-counter_struct['StatusBits'] = BITS(("", "", "", "", "", "", "", "", "", "", "", "UN", "OV", "DN", "CD", "CU"))
+counter_struct['StatusBits'] = BITS([""] * 27 + ["UN", "OV", "DN", "CD", "CU"])
 counter_struct['PRE'] = DINT
 counter_struct['ACC'] = DINT
 COUNTER = UDT(counter_struct)

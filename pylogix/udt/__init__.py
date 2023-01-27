@@ -1,1 +1,1 @@
-from .lgx_udt import SINT, INT, DINT, REAL, SPARE, ARRAY, TIMER, COUNTER
+from .lgx_udt import SINT, INT, DINT, REAL, SPARE, ARRAY, TIMER, COUNTER, BITS, UDT
