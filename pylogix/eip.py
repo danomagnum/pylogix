@@ -137,6 +137,24 @@ class PLC(object):
         """
         return self._getPLCTime(raw)
 
+
+    def GetAttributeSingle(self, class_id: int, instance_id: int, attribute_id):
+        """
+        Send a message equivalent to a 'get attribute single' CIP Generic MSG in a controller
+        class_id = the cip class the service is targeted at. valid range 0-65535
+        instance_id = the instance of the class the service is targeted at. valid range 0-65535
+        attribute_id = the attribute to get. valid range 0-65535
+
+        returns Response class (.TagName, .Value, .Status)
+        where .Value is the raw byte response
+        """
+        service_id = 0x0E
+        AttributeCount = 0x01
+        data = pack('<HH',
+                     AttributeCount,
+                     attribute_id)
+        return self._getCustomMsg(service_id, class_id, instance_id, data)
+
     def SetPLCTime(self):
         """
         Sets the PLC's clock time
@@ -656,6 +674,7 @@ class PLC(object):
                         AttributeCount,
                         TimeAttribute)
 
+        return(request)
         status, ret_data = self.conn.send(request)
 
         if status == 0:
@@ -670,6 +689,48 @@ class PLC(object):
             value = None
 
         return Response(None, value, status)
+
+    def _getCustomMsg(self, service_id: int, class_id: int, instance_id: int, data:bytes):
+        """
+        Requests the an arbitrary unconnected service from the PLC/device in unconnected mode.
+        """
+        conn = self.conn.connect(False)
+        if not conn[0]:
+            return Response(None, None, conn[1])
+      
+        AttributeService = service_id
+        AttributeSize = 0x02
+        if class_id > 255:
+            # 16 bit class type
+            AttributeClassType = 0x21
+        else:
+            # 8 bit class type
+            AttributeClassType = 0x20
+        AttributeClass = class_id
+        if instance_id > 255:
+            # 16 bit instance
+            AttributeInstanceType = 0x25
+        else:
+            # 8 bit instance
+            AttributeInstanceType = 0x24
+        AttributeInstance = instance_id
+
+        request = pack('<BBBBBBH',
+                        AttributeService,
+                        AttributeSize,
+                        AttributeClassType,
+                        AttributeClass,
+                        AttributeInstanceType,
+                        AttributeInstance)
+
+        if data is not None:
+            request += data
+
+        status, ret_data = self.conn.send(request, connected=False, slot=0)
+
+
+        return Response(None, ret_data, status)
+
 
     def _setPLCTime(self):
         """
