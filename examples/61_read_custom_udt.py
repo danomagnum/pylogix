@@ -16,14 +16,14 @@ more tags, you wouldn't want to call .Close() every time.
 from pylogix import PLC, udt
 
 udt_str = OrderedDict()
-udt_str["b_BOOL"]= udt.BOOLS(("MyFlag1", "MyFlag2"))
+udt_str["Bools"]= udt.BOOLS(["b_BOOL"])
 udt_str["b_BITS"]= udt.DINT
 udt_str["b_SINT"]= udt.SINT
 udt_str["b_INT"]= udt.INT
 udt_str["b_DINT"]= udt.DINT
 udt_str["b_LINT"]= udt.LINT
 udt_str["b_REAL"]= udt.REAL
-udt_str["b_STRING"]= udt.STRING(60)
+udt_str["b_STRING"]= udt.STRING(82, False) # default 82 length string
 udt_str["b_Timer"]= udt.TIMER
 
 myudt = udt.UDT(udt_str)
