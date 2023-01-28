@@ -31,11 +31,20 @@ BasicUDT_Struct["b_Timer"]= udt.TIMER
 
 basicUDT = udt.UDT(BasicUDT_Struct)
 
+# Defining another UDT that contains the first one.
+NestedUDT_Struct = OrderedDict()
+NestedUDT_Struct['Bools'] = udt.BOOLS(['b_Bool1', 'b_Bool2'])
+NestedUDT_Struct['b_Basic'] = basicUDT # UDTs can be nested
+NestedUDT_Struct['b_DINT'] = udt.DINT
+NestedUDT_Struct['b_Counter'] = udt.COUNTER
+
+NestedUDT = udt.UDT(NestedUDT_Struct)
+
 comm = PLC()
 comm.IPAddress = '192.168.2.241'
-ret = comm.Read('UDTBasic')
+ret = comm.Read('Program:MainProgram.NestedUDT')
 print(list(ret.Value))
-udt_data = basicUDT.unpack(ret.Value)
+udt_data = NestedUDT.unpack(ret.Value)
 print(udt_data)
 
 
