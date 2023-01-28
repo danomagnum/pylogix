@@ -100,8 +100,8 @@ USINT = BasicType('B')
 BOOL = BasicType('?')
 INT = BasicType('h')
 UINT = BasicType('H')
-DINT = BasicType('l')
-UDINT = BasicType('L')
+DINT = BasicType('i')
+UDINT = BasicType('I')
 LINT = BasicType('q')
 ULINT = BasicType('Q')
 REAL = BasicType('f')
@@ -115,7 +115,7 @@ class BYTES(CIPType):
         :param length: how many elements the array contains
         """
         self.length = length
-        self.format = f'{length}s'
+        self.format = '{}s'.format(length)
         self.struct = struct.Struct(self.format)
 
     def __reduce__(self):
@@ -146,7 +146,7 @@ class BYTES(CIPType):
 
 
 class STRING(CIPType):
-    def __init__(self, length, null_term=True, encoding=None):
+    def __init__(self, length=82, null_term=True, encoding=None):
         """
         Structure object for creating strings.  These map to python strings
         :param length: how many elements the array contains
@@ -156,7 +156,7 @@ class STRING(CIPType):
         self.length = length
         self.encoding = encoding
         self.null_term = null_term
-        self.format = f'{length}s'
+        self.format = 'I{}s'.format(length)
         self.struct = struct.Struct(self.format)
 
     def __reduce__(self):
@@ -169,15 +169,18 @@ class STRING(CIPType):
         :return: (value, number of items used from list)
         """
 
+        strlen = unpacked_data[0]
         if self.encoding is None:
-            str_data = unpacked_data[0].decode()
+            str_data = unpacked_data[1].decode()
         else:
-            str_data = unpacked_data[0].decode(encoding=self.encoding)
+            str_data = unpacked_data[1].decode(encoding=self.encoding)
 
         if self.null_term:
             str_data = str_data[:str_data.find('\x00')]
+        else:
+            str_data = str_data[:strlen]
 
-        return str_data, 1
+        return str_data, 2
 
     def create_packlist(self, value):
         """
@@ -185,9 +188,9 @@ class STRING(CIPType):
          It should match the format returned by get_format
         """
         if self.encoding is not None:
-            return [value.encode(encoding=self.encoding)]
+            return [len(value), value.encode(encoding=self.encoding)]
         else:
-            return [value.encode()]
+            return [len(value), value.encode()]
 
 
 class SPARE(CIPType):
@@ -201,7 +204,7 @@ class SPARE(CIPType):
         :param length: how many bytes of padding to use
         '''
         self.length = length
-        self.format = f'{self.length}x'
+        self.format = '{}x'.format(self.length)
         self.struct = struct.Struct(self.format)
 
     def __reduce__(self):
@@ -337,7 +340,7 @@ class UDT(CIPType):
         return final_dict, len(keys) + unpack_offset
 
 
-class BITS(CIPType):
+class BOOLS(CIPType):
     def __init__(self, BitNames):
         """
         Structure object for creating packed bools in a UDT
@@ -348,7 +351,7 @@ class BITS(CIPType):
         self.length = len(BitNames) // 32
         if self.length == 0:
             self.length = 1
-        self.format = f'{self.length}I'
+        self.format = '{}I'.format(self.length)
         self.struct = struct.Struct(self.format)
         self.BitNames = BitNames
 
@@ -404,13 +407,13 @@ class BITS(CIPType):
 
 # note that for some reason the bits on these built-in data types are backwards (big endian on a 16 bit word boundary)
 timer_struct = OrderedDict()
-timer_struct['StatusBits'] = BITS( [""]*29 + ["DN", "TT", "EN"])
+timer_struct['StatusBits'] = BOOLS( [""]*29 + ["DN", "TT", "EN"])
 timer_struct['PRE'] = DINT
 timer_struct['ACC'] = DINT
 TIMER = UDT(timer_struct)
 
 counter_struct = OrderedDict()
-counter_struct['StatusBits'] = BITS([""] * 27 + ["UN", "OV", "DN", "CD", "CU"])
+counter_struct['StatusBits'] = BOOLS([""] * 27 + ["UN", "OV", "DN", "CD", "CU"])
 counter_struct['PRE'] = DINT
 counter_struct['ACC'] = DINT
 COUNTER = UDT(counter_struct)
