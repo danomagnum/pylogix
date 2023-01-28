@@ -16,19 +16,23 @@ more tags, you wouldn't want to call .Close() every time.
 from pylogix import PLC, udt
 
 udt_str = OrderedDict()
-udt_str["MyDint"]= udt.DINT
-udt_str["MyReal"]= udt.REAL
-udt_str["Flags"]= udt.BITS(("MyFlag1", "MyFlag2"))
-udt_str["MyTimer"]= udt.TIMER
-udt_str["MyInt"]= udt.INT
+udt_str["b_BOOL"]= udt.BOOLS(("MyFlag1", "MyFlag2"))
+udt_str["b_BITS"]= udt.DINT
+udt_str["b_SINT"]= udt.SINT
+udt_str["b_INT"]= udt.INT
+udt_str["b_DINT"]= udt.DINT
+udt_str["b_LINT"]= udt.LINT
+udt_str["b_REAL"]= udt.REAL
+udt_str["b_STRING"]= udt.STRING(60)
+udt_str["b_Timer"]= udt.TIMER
 
 myudt = udt.UDT(udt_str)
 
 comm = PLC()
-comm.IPAddress = '10.40.39.26'
-ret = comm.Read('MyExampleUDT')
-udt_data = myudt.unpack(ret.Value)
+comm.IPAddress = '192.168.2.241'
+ret = comm.Read('UDTBasic')
 print(list(ret.Value))
+udt_data = myudt.unpack(ret.Value)
 print(udt_data)
 
 
