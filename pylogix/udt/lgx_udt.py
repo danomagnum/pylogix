@@ -146,7 +146,7 @@ class BYTES(CIPType):
 
 
 class STRING(CIPType):
-    def __init__(self, length=82, null_term=True, encoding=None):
+    def __init__(self, length=82, null_term=False, encoding=None):
         """
         Structure object for creating strings.  These map to python strings
         :param length: how many elements the array contains
