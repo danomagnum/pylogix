@@ -8,13 +8,17 @@ class CIPType(object):
     template for classes that provide those wits.
     """
 
-    def __init__(self):
+    def __init__(self, endianness = None):
         """
         Needs to define the format and instantiate the struct
         """
         self.format = ''
-        self.endianness = '<'
+        if endianness is None:
+            self.endianness = ''
+        else:
+            self.endianness = '<'
         self.struct = struct.Struct(self.format)
+        self.alignment = 4
 
 
     def __len__(self):
@@ -58,6 +62,7 @@ class CIPType(object):
         and then return an ordered dictionary with the data assigned to the keys.
         """
         unpack_struct = self.struct
+        endian = '<'
         if endian is not None:
           unpack_struct = struct.Struct(endian + self.format)
         unpacked = unpack_struct.unpack_from(data_array, offset)
@@ -67,10 +72,11 @@ class CIPType(object):
 
 
 class BasicType(CIPType):
-    def __init__(self, format_str):
+    def __init__(self, format_str, alignment=4):
         self.format = format_str
         self.endianness = '<'
         self.struct = struct.Struct(self.format)
+        self.alignment = alignment
 
     def parse_unpacked(self, unpacked_data):
         """
@@ -95,17 +101,17 @@ class BasicType(CIPType):
 
 # Provide easier to use definitions of the constants the struct module uses.
 # See https://docs.python.org/3/library/struct.html
-SINT = BasicType('b')
-USINT = BasicType('B')
-BOOL = BasicType('?')
-INT = BasicType('h')
-UINT = BasicType('H')
-DINT = BasicType('i')
-UDINT = BasicType('I')
-LINT = BasicType('q')
-ULINT = BasicType('Q')
+SINT = BasicType('b', 1)
+USINT = BasicType('B', 1)
+BOOL = BasicType('?', 1)
+INT = BasicType('h', 2)
+UINT = BasicType('H', 2)
+DINT = BasicType('i', 4)
+UDINT = BasicType('I', 4)
+LINT = BasicType('q', 8)
+ULINT = BasicType('Q', 8)
 REAL = BasicType('f')
-LREAL = BasicType('d')
+LREAL = BasicType('d', 8)
 
 
 class BYTES(CIPType):
@@ -117,6 +123,7 @@ class BYTES(CIPType):
         self.length = length
         self.format = '{}s'.format(length)
         self.struct = struct.Struct(self.format)
+        self.alignment = 1
 
     def __reduce__(self):
         return (self.__class__, (self.length,))
@@ -158,6 +165,7 @@ class STRING(CIPType):
         self.null_term = null_term
         self.format = 'I{}s'.format(length)
         self.struct = struct.Struct(self.format)
+        self.alignment = 4
 
     def __reduce__(self):
         return (self.__class__, (self.length, self.null_term, self.encoding))
@@ -206,6 +214,7 @@ class SPARE(CIPType):
         self.length = length
         self.format = '{}x'.format(self.length)
         self.struct = struct.Struct(self.format)
+        self.alignment = 1
 
     def __reduce__(self):
         return (self.__class__, (self.length,))
@@ -243,6 +252,7 @@ class ARRAY(CIPType):
         self.length = length
         self.format = self.data_type.format * self.length
         self.struct = struct.Struct(self.format)
+        self.alignment = 4
 
     def __reduce__(self):
         return (self.__class__, (self.data_type, self.length))
@@ -276,84 +286,24 @@ class ARRAY(CIPType):
             packlist += new_list
         return packlist
 
-
-class UDT(CIPType):
-    """
-    This is the core binary struct class that will need used.
-    """
-
-    def __init__(self, structure_dict, endianness=None):
-        """
-        Initialize this class with a structure ordereddict (see example in the tests) to get an object
-        you can use to convert back and forth from binary data and dicts
-        :param structure_dict: ordereddict of the ALLCAPS types.  Can be nested to create complex structs
-        """
-        self.structure_dict = structure_dict
-        if endianness is None:
-          endianness = ''
-        self.endianness = endianness
-
-        self.format = '' + self.endianness
-
-        for k, v in self.structure_dict.items():
-            if isinstance(v, OrderedDict):
-                new_binarystructure = UDT(v)
-                self.structure_dict[k] = new_binarystructure
-                v = new_binarystructure
-
-            self.format += v.format
-
-        self.struct = struct.Struct(self.format)
-
-    def __reduce__(self):
-        return (self.__class__, (self.structure_dict,))
-
-    def create_packlist(self, value):
-        """
-         returns a list that gets combined onto the end of the current list to be packed.
-         It should match the format returned by get_format
-        :return:
-        """
-        data_list = []
-        keys = list(self.structure_dict.keys())
-
-        for k in keys:
-            struct_type = self.structure_dict[k]
-            val = value.get(k)  # will return None if the key is missing
-            data_list += struct_type.create_packlist(val)
-
-        return data_list
-
-    def parse_unpacked(self, unpacked_data):
-        # final_dict = OrderedDict()
-        final_dict = {}
-
-        keys = list(self.structure_dict.keys())
-
-        unpack_offset = 0
-        for x in range(len(keys)):
-            key = keys[x]
-            format_type = self.structure_dict[key]
-            final_dict[key], new_offset = format_type.parse_unpacked(unpacked_data[x + unpack_offset:])
-            unpack_offset += new_offset - 1
-
-        return final_dict, len(keys) + unpack_offset
-
-
 class BOOLS(CIPType):
     def __init__(self, BitNames):
         """
         Structure object for creating packed bools in a UDT
         :param BitNames: a list of strings, one per bit in order from first to last
         """
-        
+
+        self.bitlen = 8
+
         # bit packed structs are aligned on 32 bit words.  Figure out how many we've got.
-        self.length = len(BitNames) // 32
-        if self.length == 0:
-            self.length = 1
-        self.format = '{}I'.format(self.length)
+        self.length = ((len(BitNames) - 1) // self.bitlen) + 1
+        self.format = '{}B'.format(self.length)
         self.struct = struct.Struct(self.format)
         self.BitNames = BitNames
+        self.alignment = 1
+
+    def add(self, bitname):
+        self.BitNames.append(bitname)
 
     def __reduce__(self):
         return (self.__class__, (self.length,))
@@ -365,11 +315,12 @@ class BOOLS(CIPType):
         """
 
         str_data = {}
+        print(unpacked_data)
 
         bitpos = 0
         for bitname in self.BitNames:
-            wordpos = bitpos // 32
-            wordbit = bitpos % 32
+            wordpos = bitpos // self.bitlen
+            wordbit = bitpos % self.bitlen
             word = unpacked_data[wordpos]
             mask = 1 << wordbit
             result = word & mask != 0
@@ -404,16 +355,96 @@ class BOOLS(CIPType):
         return bytes([0] * len(self))
 
 
+class UDT(CIPType):
+    """
+    This is the core binary struct class that will need used.
+    """
+
+    def __init__(self):
+        """
+        Initialize this class with a structure ordereddict (see example in the tests) to get an object
+        you can use to convert back and forth from binary data and dicts
+        :param structure_dict: ordereddict of the ALLCAPS types.  Can be nested to create complex structs
+        """
+        self.endianness = ''
+
+        self.format = '' + self.endianness
+
+        self.structure_def = []
+        self.struct = struct.Struct(self.format)
+        self.alignment = 4
+
+    def __setitem__(self, item, value):
+        #if isinstance(value, BOOL):
+        #    # adding a bool we need to see if we're currently building a bool byte
+        #    if isinstance(self.structure_def[-1][1], BOOLS):
+        #        # already packing some bools.
+        #        self.structure_def[-1][1].Add(item)
+
+        self.structure_def.append((item, value))
+        self.rebuild_format()
+
+        # per 1756-rm094_-en-p.pdf any UDT with an 8-byte data type in it gets promoted to
+        # an 8-byte alignment also.
+        if value.alignment == 8:
+            self.alignment = 8
+    
+    def rebuild_format(self):
+        self.format = self.endianness
+        for k, v in self.structure_def:
+            s = struct.Struct(self.format)
+            offset = s.size % v.alignment
+            if offset > 0 :
+                self.format += "{}x".format(v.alignment - offset)
+            self.format += v.format
+
+        print(self.format)
+        self.struct = struct.Struct(self.format)
+
+    def __reduce__(self):
+        return (self.__class__, (self.structure_def,))
+
+    def create_packlist(self, value):
+        """
+         returns a list that gets combined onto the end of the current list to be packed.
+         It should match the format returned by get_format
+        :return:
+        """
+        data_list = []
+        keys = list(self.structure_def.keys())
+
+        for k in keys:
+            struct_type = self.structure_def[k]
+            val = value.get(k)  # will return None if the key is missing
+            data_list += struct_type.create_packlist(val)
+
+        return data_list
+
+    def parse_unpacked(self, unpacked_data):
+        # final_dict = OrderedDict()
+        final_dict = {}
+
+
+        unpack_offset = 0
+        x = 0
+        for k, v in self.structure_def:
+            final_dict[k], new_offset = v.parse_unpacked(unpacked_data[x + unpack_offset:])
+            print(f'{k}: {final_dict[k]}')
+            unpack_offset += new_offset - 1
+            x += 1
+
+        return final_dict, x + unpack_offset
+
+
+
 
 # note that for some reason the bits on these built-in data types are backwards (big endian on a 16 bit word boundary)
-timer_struct = OrderedDict()
-timer_struct['StatusBits'] = BOOLS( [""]*29 + ["DN", "TT", "EN"])
-timer_struct['PRE'] = DINT
-timer_struct['ACC'] = DINT
-TIMER = UDT(timer_struct)
+TIMER = UDT()
+TIMER['StatusBits'] = BOOLS( [""]*29 + ["DN", "TT", "EN"])
+TIMER['PRE'] = DINT
+TIMER['ACC'] = DINT
 
-counter_struct = OrderedDict()
-counter_struct['StatusBits'] = BOOLS([""] * 27 + ["UN", "OV", "DN", "CD", "CU"])
-counter_struct['PRE'] = DINT
-counter_struct['ACC'] = DINT
-COUNTER = UDT(counter_struct)
+COUNTER = UDT()
+COUNTER['StatusBits'] = BOOLS([""] * 27 + ["UN", "OV", "DN", "CD", "CU"])
+COUNTER['PRE'] = DINT
+COUNTER['ACC'] = DINT

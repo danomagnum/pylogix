@@ -15,7 +15,7 @@ more tags, you wouldn't want to call .Close() every time.
 from pylogix import PLC, udt
 
 comm = PLC()
-comm.IPAddress = '10.40.39.26'
+comm.IPAddress = '192.168.2.241'
 ret = comm.Read('Timer1')
 timer_data = udt.TIMER.unpack(ret.Value)
 # timer_data is now in the form of {'Padding': None, 'StatusBits': {'DN': True, 'TT': False, 'EN': True}, 'PRE': 1, 'ACC': 2}
