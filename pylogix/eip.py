@@ -517,10 +517,13 @@ class PLC(object):
         # the tag name and data type
         new_tags = []
         for t in tags:
-            if len(t) == 3:
-                new_tags.append((t[0], t[2]))
-            else:
-                new_tags.append(t[0])
+            if isinstance(t, (list, tuple)):
+                if len(t) == 3:
+                    new_tags.append(t)
+                elif len(t) == 2:
+                    new_tags.append([t[0], t[1], None])
+                else:
+                    new_tags.append([t[0], 1, None])
 
         self._get_unknown_types(new_tags)
 
